@@ -1,29 +1,29 @@
-const API_KEY = "YOUR_API_KEY";
-
 let videos = [];
 let totalSeconds = 0;
 
 
-// Get playlist ID from URL
+// Get playlist ID from YouTube URL
 function getPlaylistId(url) {
+
     try {
         let link = new URL(url);
         return link.searchParams.get("list");
-    } catch {
+    } catch (error) {
         return null;
     }
 }
 
 
-// Main function
+// Analyze playlist
 async function analyzePlaylist() {
 
-    let url = document.getElementById("playlistUrl").value;
+    let url = document.getElementById("playlistUrl").value.trim();
     let playlistId = getPlaylistId(url);
     let message = document.getElementById("message");
 
     if (!playlistId) {
-        message.textContent = "Please enter a valid YouTube playlist URL.";
+        message.textContent =
+            "Please enter a valid YouTube playlist URL.";
         return;
     }
 
@@ -31,109 +31,114 @@ async function analyzePlaylist() {
 
     try {
 
-        // Get playlist name
-        let playlistResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${playlistId}&key=${API_KEY}`
-        );
-
-        let playlistData = await playlistResponse.json();
-
-        if (!playlistData.items || playlistData.items.length === 0) {
-            message.textContent = "Playlist not found.";
-            return;
-        }
-
-        let title = playlistData.items[0].snippet.title;
-
-
-        // Get videos
-        let response = await fetch(
-            `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=50&playlistId=${playlistId}&key=${API_KEY}`
-        );
+        // Call our Vercel backend
+        let response =
+            await fetch(`/api/youtube?playlistId=${playlistId}`);
 
         let data = await response.json();
 
-        if (!data.items) {
-            message.textContent = "Could not get playlist videos.";
+        if (!response.ok) {
+            message.textContent =
+                data.error || "Could not load playlist.";
             return;
         }
 
-        let ids = data.items.map(
-            item => item.snippet.resourceId.videoId
-        );
+        // Store videos
+        videos = data.videos.map(function(video) {
 
+            return {
+                title: video.title,
+                seconds: convertDuration(video.duration)
+            };
 
-        // Get video durations
-        let videoResponse = await fetch(
-            `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${ids.join(",")}&key=${API_KEY}`
-        );
+        });
 
-        let videoData = await videoResponse.json();
-
-        videos = [];
-
-        for (let i = 0; i < videoData.items.length; i++) {
-
-            videos.push({
-                title: data.items[i].snippet.title,
-                seconds: convertDuration(
-                    videoData.items[i].contentDetails.duration
-                )
-            });
-        }
-
-
+        // Calculate total duration
         totalSeconds = 0;
 
-        videos.forEach(video => {
+        videos.forEach(function(video) {
             totalSeconds += video.seconds;
         });
 
 
-        // Show result
-        document.getElementById("result").classList.remove("hidden");
+        // Show result section
+        document
+            .getElementById("result")
+            .classList.remove("hidden");
 
-        document.getElementById("playlistTitle").textContent = title;
 
+        // Playlist title
+        document.getElementById("playlistTitle").textContent =
+            data.title;
+
+
+        // Number of videos
         document.getElementById("videoCount").textContent =
             videos.length;
 
+
+        // Total duration
         document.getElementById("totalTime").textContent =
             formatTime(totalSeconds);
 
-        document.getElementById("averageTime").textContent =
-            formatTime(totalSeconds / videos.length);
+
+        // Average duration
+        if (videos.length > 0) {
+
+            document.getElementById("averageTime").textContent =
+                formatTime(totalSeconds / videos.length);
+
+        } else {
+
+            document.getElementById("averageTime").textContent =
+                "0 min";
+        }
+
 
         message.textContent = "";
 
+        // Create study plan
         createPlan();
 
     } catch (error) {
 
         console.log(error);
+
         message.textContent =
-            "Something went wrong. Check your API key.";
+            "Something went wrong. Please try again.";
     }
 }
 
 
-// Convert YouTube duration to seconds
+
+// Convert YouTube ISO duration to seconds
 function convertDuration(duration) {
 
     let hours = 0;
     let minutes = 0;
     let seconds = 0;
 
-    let h = duration.match(/(\d+)H/);
-    let m = duration.match(/(\d+)M/);
-    let s = duration.match(/(\d+)S/);
+    let hourMatch = duration.match(/(\d+)H/);
+    let minuteMatch = duration.match(/(\d+)M/);
+    let secondMatch = duration.match(/(\d+)S/);
 
-    if (h) hours = Number(h[1]);
-    if (m) minutes = Number(m[1]);
-    if (s) seconds = Number(s[1]);
+    if (hourMatch) {
+        hours = parseInt(hourMatch[1]);
+    }
 
-    return hours * 3600 + minutes * 60 + seconds;
+    if (minuteMatch) {
+        minutes = parseInt(minuteMatch[1]);
+    }
+
+    if (secondMatch) {
+        seconds = parseInt(secondMatch[1]);
+    }
+
+    return (hours * 3600) +
+           (minutes * 60) +
+           seconds;
 }
+
 
 
 // Convert seconds into readable time
@@ -142,125 +147,233 @@ function formatTime(seconds) {
     seconds = Math.round(seconds);
 
     let hours = Math.floor(seconds / 3600);
-    let minutes = Math.floor((seconds % 3600) / 60);
+
+    let minutes =
+        Math.floor((seconds % 3600) / 60);
 
     if (hours > 0) {
-        return hours + "h " + minutes + "m";
+
+        return hours + "h " +
+               minutes + "m";
+
     }
 
     return minutes + " min";
 }
 
 
-// Create study plan
+
+// Create personalized study plan
 function createPlan() {
 
     if (videos.length === 0) {
         return;
     }
 
-    let hours = Number(document.getElementById("hours").value);
-    let minutes = Number(document.getElementById("minutes").value);
-    let speed = Number(document.getElementById("speed").value);
 
-    let dailyMinutes = hours * 60 + minutes;
+    let hours =
+        parseInt(document.getElementById("hours").value) || 0;
+
+    let minutes =
+        parseInt(document.getElementById("minutes").value) || 0;
+
+    let speed =
+        parseFloat(document.getElementById("speed").value) || 1;
+
+
+    // Daily available study time
+    let dailyMinutes =
+        (hours * 60) + minutes;
+
 
     if (dailyMinutes <= 0) {
-        alert("Enter your daily study time.");
+
+        document.getElementById("daysNeeded").textContent = "-";
+        document.getElementById("videosPerDay").textContent = "-";
+        document.getElementById("finishDate").textContent = "-";
+
+        document.getElementById("schedule").innerHTML =
+            "<p>Please enter your daily study time.</p>";
+
         return;
     }
 
 
-    // Actual watch time after playback speed
-    let remainingTime = totalSeconds / 60 / speed;
+    // Convert daily time into seconds
+    let dailySeconds =
+        dailyMinutes * 60;
 
-    let days = 0;
+
+    // Create days
+    let days = [];
+    let currentDay = [];
     let currentTime = 0;
-    let currentVideos = 0;
-
-    let plan = [];
 
 
-    for (let video of videos) {
+    videos.forEach(function(video) {
 
-        let videoTime = video.seconds / 60 / speed;
+        // Actual watch time at selected speed
+        let watchTime =
+            video.seconds / speed;
 
+
+        /*
+         If adding this video crosses the daily limit,
+         start a new day.
+        */
         if (
-            currentTime + videoTime > dailyMinutes &&
-            currentVideos > 0
+            currentTime + watchTime > dailySeconds &&
+            currentDay.length > 0
         ) {
-            days++;
 
-            plan.push({
-                day: days,
-                minutes: currentTime,
-                videos: currentVideos
+            days.push({
+                videos: currentDay,
+                seconds: currentTime
             });
 
+            currentDay = [];
             currentTime = 0;
-            currentVideos = 0;
         }
 
-        currentTime += videoTime;
-        currentVideos++;
-    }
 
+        currentDay.push(video);
+        currentTime += watchTime;
 
-    // Add last day
-    if (currentVideos > 0) {
-
-        days++;
-
-        plan.push({
-            day: days,
-            minutes: currentTime,
-            videos: currentVideos
-        });
-    }
-
-
-    document.getElementById("daysNeeded").textContent = days;
-
-    document.getElementById("videosPerDay").textContent =
-        Math.ceil(videos.length / days);
-
-
-    let date = new Date();
-
-    date.setDate(date.getDate() + days - 1);
-
-    document.getElementById("finishDate").textContent =
-        date.toLocaleDateString();
-
-
-    // Display plan
-    let schedule = document.getElementById("schedule");
-
-    schedule.innerHTML = "";
-
-    plan.forEach(day => {
-
-        let div = document.createElement("div");
-
-        div.className = "day";
-
-        div.innerHTML = `
-            <h3>Day ${day.day}</h3>
-            <p><b>${day.videos}</b> videos</p>
-            <p>Watch time: ${formatTime(day.minutes * 60)}</p>
-        `;
-
-        schedule.appendChild(div);
     });
 
 
-    // Speed comparison
-    document.getElementById("normalTime").textContent =
+    // Add last day
+    if (currentDay.length > 0) {
+
+        days.push({
+            videos: currentDay,
+            seconds: currentTime
+        });
+
+    }
+
+
+    // Number of days
+    document.getElementById("daysNeeded").textContent =
+        days.length;
+
+
+    // Average videos per day
+    let averageVideos =
+        Math.ceil(videos.length / days.length);
+
+    document.getElementById("videosPerDay").textContent =
+        averageVideos;
+
+
+    // Calculate finish date
+    let finishDate = new Date();
+
+    finishDate.setDate(
+        finishDate.getDate() + days.length - 1
+    );
+
+
+    let dateText =
+        finishDate.toLocaleDateString("en-IN", {
+            day: "numeric",
+            month: "short",
+            year: "numeric"
+        });
+
+
+    document.getElementById("finishDate").textContent =
+        dateText;
+
+
+    // Display daily schedule
+    let schedule =
+        document.getElementById("schedule");
+
+    schedule.innerHTML = "";
+
+
+    days.forEach(function(day, index) {
+
+        let dayBox =
+            document.createElement("div");
+
+        dayBox.className = "day";
+
+
+        let title =
+            document.createElement("h3");
+
+        title.textContent =
+            "Day " + (index + 1);
+
+
+        let videoText =
+            document.createElement("p");
+
+        videoText.innerHTML =
+            "<b>" +
+            day.videos.length +
+            "</b> videos";
+
+
+        let timeText =
+            document.createElement("p");
+
+        timeText.textContent =
+            "Watch time: " +
+            formatTime(day.seconds);
+
+
+        dayBox.appendChild(title);
+        dayBox.appendChild(videoText);
+        dayBox.appendChild(timeText);
+
+
+        schedule.appendChild(dayBox);
+
+    });
+
+
+    // Update speed comparison
+    updateSpeedComparison(speed);
+}
+
+
+
+// Compare different playback speeds
+function updateSpeedComparison(speed) {
+
+    let normalTime =
         formatTime(totalSeconds);
 
-    document.getElementById("fastTime").textContent =
-        formatTime(remainingTime * 60);
+    let fastTime =
+        formatTime(totalSeconds / speed);
+
+
+    document.getElementById("normalTime").textContent =
+        normalTime;
+
 
     document.getElementById("currentSpeed").textContent =
         speed + "x";
+
+
+    document.getElementById("fastTime").textContent =
+        fastTime;
 }
+
+
+
+// Create plan whenever settings change
+document
+    .getElementById("hours")
+    .addEventListener("input", createPlan);
+
+document
+    .getElementById("minutes")
+    .addEventListener("input", createPlan);
+
+document
+    .getElementById("speed")
+    .addEventListener("change", createPlan);
