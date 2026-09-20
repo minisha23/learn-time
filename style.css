@@ -234,3 +234,13 @@ footer {
         flex-direction: column;
     }
 }
+.day ul {
+    margin-top: 10px;
+    padding-left: 20px;
+}
+
+.day li {
+    margin-bottom: 6px;
+    font-size: 14px;
+    line-height: 1.4;
+}

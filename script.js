@@ -170,7 +170,6 @@ function createPlan() {
         return;
     }
 
-
     let hours =
         parseInt(document.getElementById("hours").value) || 0;
 
@@ -181,7 +180,7 @@ function createPlan() {
         parseFloat(document.getElementById("speed").value) || 1;
 
 
-    // Daily available study time
+    // Total study time available per day
     let dailyMinutes =
         (hours * 60) + minutes;
 
@@ -189,7 +188,9 @@ function createPlan() {
     if (dailyMinutes <= 0) {
 
         document.getElementById("daysNeeded").textContent = "-";
+
         document.getElementById("videosPerDay").textContent = "-";
+
         document.getElementById("finishDate").textContent = "-";
 
         document.getElementById("schedule").innerHTML =
@@ -199,71 +200,127 @@ function createPlan() {
     }
 
 
-    // Convert daily time into seconds
+    // Convert daily time to seconds
     let dailySeconds =
         dailyMinutes * 60;
 
 
-    // Create days
     let days = [];
-    let currentDay = [];
-    let currentTime = 0;
+
+    let currentDay = {
+        videos: [],
+        seconds: 0
+    };
 
 
-    videos.forEach(function(video) {
+    /*
+        Go through every video.
 
-        // Actual watch time at selected speed
-        let watchTime =
+        A video can now be split across multiple days
+        if it is longer than the remaining daily time.
+    */
+
+    videos.forEach(function(video, videoIndex) {
+
+        let remainingSeconds =
             video.seconds / speed;
 
 
-        /*
-         If adding this video crosses the daily limit,
-         start a new day.
-        */
-        if (
-            currentTime + watchTime > dailySeconds &&
-            currentDay.length > 0
-        ) {
+        while (remainingSeconds > 0) {
 
-            days.push({
-                videos: currentDay,
-                seconds: currentTime
+            let availableSeconds =
+                dailySeconds - currentDay.seconds;
+
+
+            // If today's time is already full,
+            // start a new day.
+            if (availableSeconds <= 0) {
+
+                days.push(currentDay);
+
+                currentDay = {
+                    videos: [],
+                    seconds: 0
+                };
+
+                availableSeconds = dailySeconds;
+            }
+
+
+            // Time of this video that can fit today
+            let watchSeconds =
+                Math.min(
+                    remainingSeconds,
+                    availableSeconds
+                );
+
+
+            currentDay.videos.push({
+                index: videoIndex,
+                title: video.title,
+                seconds: watchSeconds,
+                remainingAfter:
+                    remainingSeconds - watchSeconds
             });
 
-            currentDay = [];
-            currentTime = 0;
+
+            currentDay.seconds += watchSeconds;
+
+            remainingSeconds -= watchSeconds;
+
         }
-
-
-        currentDay.push(video);
-        currentTime += watchTime;
 
     });
 
 
-    // Add last day
-    if (currentDay.length > 0) {
+    // Add final day
+    if (currentDay.videos.length > 0) {
 
-        days.push({
-            videos: currentDay,
-            seconds: currentTime
-        });
+        days.push(currentDay);
 
     }
 
 
-    // Number of days
+    // Number of study days
     document.getElementById("daysNeeded").textContent =
         days.length;
 
 
-    // Average videos per day
+    /*
+        Average videos per day.
+
+        We count unique videos touched on each day,
+        so a split video is not counted twice.
+    */
+
+    let totalDailyVideoCount = 0;
+
+
+    days.forEach(function(day) {
+
+        let uniqueVideos = new Set();
+
+        day.videos.forEach(function(segment) {
+
+            uniqueVideos.add(segment.index);
+
+        });
+
+        day.videoCount =
+            uniqueVideos.size;
+
+        totalDailyVideoCount +=
+            uniqueVideos.size;
+
+    });
+
+
     let averageVideos =
-        Math.ceil(videos.length / days.length);
+        totalDailyVideoCount / days.length;
+
 
     document.getElementById("videosPerDay").textContent =
-        averageVideos;
+        averageVideos.toFixed(1);
 
 
     // Calculate finish date
@@ -301,6 +358,7 @@ function createPlan() {
         dayBox.className = "day";
 
 
+        // Day heading
         let title =
             document.createElement("h3");
 
@@ -308,27 +366,76 @@ function createPlan() {
             "Day " + (index + 1);
 
 
-        let videoText =
+        // Video count
+        let videoCount =
             document.createElement("p");
 
-        videoText.innerHTML =
+        videoCount.innerHTML =
             "<b>" +
-            day.videos.length +
-            "</b> videos";
+            day.videoCount +
+            "</b> video" +
+            (day.videoCount !== 1 ? "s" : "");
 
 
+        // Watch time
         let timeText =
             document.createElement("p");
 
         timeText.textContent =
-            "Watch time: " +
+            "Study time: " +
             formatTime(day.seconds);
 
 
         dayBox.appendChild(title);
-        dayBox.appendChild(videoText);
+
+        dayBox.appendChild(videoCount);
+
         dayBox.appendChild(timeText);
 
+
+        /*
+            Show what to watch on this day
+        */
+
+        let videoList =
+            document.createElement("ul");
+
+        day.videos.forEach(function(segment) {
+
+            let item =
+                document.createElement("li");
+
+
+            let segmentMinutes =
+                Math.round(segment.seconds / 60);
+
+
+            let isContinuation =
+                segment.remainingAfter > 0;
+
+
+            let text =
+                segment.title +
+                " — " +
+                segmentMinutes +
+                " min";
+
+
+            if (isContinuation) {
+
+                text += " (continue tomorrow)";
+
+            }
+
+
+            item.textContent = text;
+
+            videoList.appendChild(item);
+
+        });
+
+
+        dayBox.appendChild(videoList);
 
         schedule.appendChild(dayBox);
 
@@ -338,9 +445,6 @@ function createPlan() {
     // Update speed comparison
     updateSpeedComparison(speed);
 }
-
-
-
 // Compare different playback speeds
 function updateSpeedComparison(speed) {
 
