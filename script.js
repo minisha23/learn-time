@@ -100,13 +100,13 @@ async function analyzePlaylist() {
         // Create study plan
         createPlan();
 
-    } catch (error) {
+    }  catch (error) {
 
-        console.log(error);
+    console.log("YouTube API error:", error);
 
-        message.textContent =
-            "Something went wrong. Please try again.";
-    }
+    return res.status(500).json({
+        error: error.message || "Something went wrong"
+    });
 }
 
 
