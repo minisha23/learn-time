@@ -4,7 +4,6 @@ let totalSeconds = 0;
 
 // Get playlist ID from YouTube URL
 function getPlaylistId(url) {
-
     try {
         let link = new URL(url);
         return link.searchParams.get("list");
@@ -14,7 +13,7 @@ function getPlaylistId(url) {
 }
 
 
-// Analyze playlist
+// Analyze YouTube playlist
 async function analyzePlaylist() {
 
     let url = document.getElementById("playlistUrl").value.trim();
@@ -31,7 +30,6 @@ async function analyzePlaylist() {
 
     try {
 
-        // Call our Vercel backend
         let response =
             await fetch(`/api/youtube?playlistId=${playlistId}`);
 
@@ -43,75 +41,52 @@ async function analyzePlaylist() {
             return;
         }
 
-        // Store videos
         videos = data.videos.map(function(video) {
-
             return {
                 title: video.title,
                 seconds: convertDuration(video.duration)
             };
-
         });
 
-        // Calculate total duration
         totalSeconds = 0;
 
         videos.forEach(function(video) {
             totalSeconds += video.seconds;
         });
 
-
-        // Show result section
         document
             .getElementById("result")
             .classList.remove("hidden");
 
-
-        // Playlist title
         document.getElementById("playlistTitle").textContent =
             data.title;
 
-
-        // Number of videos
         document.getElementById("videoCount").textContent =
             videos.length;
 
-
-        // Total duration
         document.getElementById("totalTime").textContent =
             formatTime(totalSeconds);
 
-
-        // Average duration
-        if (videos.length > 0) {
-
-            document.getElementById("averageTime").textContent =
-                formatTime(totalSeconds / videos.length);
-
-        } else {
-
-            document.getElementById("averageTime").textContent =
-                "0 min";
-        }
-
+        document.getElementById("averageTime").textContent =
+            videos.length > 0
+                ? formatTime(totalSeconds / videos.length)
+                : "0 min";
 
         message.textContent = "";
 
-        // Create study plan
         createPlan();
 
-    }  catch (error) {
+    } catch (error) {
 
-    console.log("YouTube API error:", error);
+        console.error("Analyze error:", error);
 
-    return res.status(500).json({
-        error: error.message || "Something went wrong"
-    });
+        message.textContent =
+            "Error: " + error.message;
+    }
 }
 
 
-
-// Convert YouTube ISO duration to seconds
+// Convert YouTube duration into seconds
 function convertDuration(duration) {
 
     let hours = 0;
@@ -140,8 +115,7 @@ function convertDuration(duration) {
 }
 
 
-
-// Convert seconds into readable time
+// Format seconds into readable time
 function formatTime(seconds) {
 
     seconds = Math.round(seconds);
@@ -152,18 +126,14 @@ function formatTime(seconds) {
         Math.floor((seconds % 3600) / 60);
 
     if (hours > 0) {
-
-        return hours + "h " +
-               minutes + "m";
-
+        return hours + "h " + minutes + "m";
     }
 
     return minutes + " min";
 }
 
 
-
-// Create personalized study plan
+// Create study plan
 function createPlan() {
 
     if (videos.length === 0) {
@@ -179,18 +149,13 @@ function createPlan() {
     let speed =
         parseFloat(document.getElementById("speed").value) || 1;
 
-
-    // Total study time available per day
     let dailyMinutes =
         (hours * 60) + minutes;
-
 
     if (dailyMinutes <= 0) {
 
         document.getElementById("daysNeeded").textContent = "-";
-
         document.getElementById("videosPerDay").textContent = "-";
-
         document.getElementById("finishDate").textContent = "-";
 
         document.getElementById("schedule").innerHTML =
@@ -199,11 +164,8 @@ function createPlan() {
         return;
     }
 
-
-    // Convert daily time to seconds
     let dailySeconds =
         dailyMinutes * 60;
-
 
     let days = [];
 
@@ -213,27 +175,17 @@ function createPlan() {
     };
 
 
-    /*
-        Go through every video.
-
-        A video can now be split across multiple days
-        if it is longer than the remaining daily time.
-    */
-
+    // Split videos across days when necessary
     videos.forEach(function(video, videoIndex) {
 
         let remainingSeconds =
             video.seconds / speed;
-
 
         while (remainingSeconds > 0) {
 
             let availableSeconds =
                 dailySeconds - currentDay.seconds;
 
-
-            // If today's time is already full,
-            // start a new day.
             if (availableSeconds <= 0) {
 
                 days.push(currentDay);
@@ -246,14 +198,11 @@ function createPlan() {
                 availableSeconds = dailySeconds;
             }
 
-
-            // Time of this video that can fit today
             let watchSeconds =
                 Math.min(
                     remainingSeconds,
                     availableSeconds
                 );
-
 
             currentDay.videos.push({
                 index: videoIndex,
@@ -263,73 +212,52 @@ function createPlan() {
                     remainingSeconds - watchSeconds
             });
 
-
             currentDay.seconds += watchSeconds;
 
             remainingSeconds -= watchSeconds;
-
         }
-
     });
 
 
-    // Add final day
     if (currentDay.videos.length > 0) {
-
         days.push(currentDay);
-
     }
 
 
-    // Number of study days
+    // Number of days
     document.getElementById("daysNeeded").textContent =
         days.length;
 
 
-    /*
-        Average videos per day.
-
-        We count unique videos touched on each day,
-        so a split video is not counted twice.
-    */
-
+    // Average videos touched per day
     let totalDailyVideoCount = 0;
-
 
     days.forEach(function(day) {
 
         let uniqueVideos = new Set();
 
         day.videos.forEach(function(segment) {
-
             uniqueVideos.add(segment.index);
-
         });
 
-        day.videoCount =
-            uniqueVideos.size;
+        day.videoCount = uniqueVideos.size;
 
-        totalDailyVideoCount +=
-            uniqueVideos.size;
-
+        totalDailyVideoCount += uniqueVideos.size;
     });
-
 
     let averageVideos =
         totalDailyVideoCount / days.length;
-
 
     document.getElementById("videosPerDay").textContent =
         averageVideos.toFixed(1);
 
 
-    // Calculate finish date
+    // Finish date
     let finishDate = new Date();
 
     finishDate.setDate(
         finishDate.getDate() + days.length - 1
     );
-
 
     let dateText =
         finishDate.toLocaleDateString("en-IN", {
@@ -338,12 +266,11 @@ function createPlan() {
             year: "numeric"
         });
 
-
     document.getElementById("finishDate").textContent =
         dateText;
 
 
-    // Display daily schedule
+    // Display schedule
     let schedule =
         document.getElementById("schedule");
 
@@ -358,7 +285,6 @@ function createPlan() {
         dayBox.className = "day";
 
 
-        // Day heading
         let title =
             document.createElement("h3");
 
@@ -366,7 +292,6 @@ function createPlan() {
             "Day " + (index + 1);
 
 
-        // Video count
         let videoCount =
             document.createElement("p");
 
@@ -377,7 +302,6 @@ function createPlan() {
             (day.videoCount !== 1 ? "s" : "");
 
 
-        // Watch time
         let timeText =
             document.createElement("p");
 
@@ -387,16 +311,11 @@ function createPlan() {
 
 
         dayBox.appendChild(title);
-
         dayBox.appendChild(videoCount);
-
         dayBox.appendChild(timeText);
 
 
-        /*
-            Show what to watch on this day
-        */
-
+        // Show videos for this day
         let videoList =
             document.createElement("ul");
 
@@ -405,14 +324,8 @@ function createPlan() {
             let item =
                 document.createElement("li");
 
-
             let segmentMinutes =
                 Math.round(segment.seconds / 60);
-
-
-            let isContinuation =
-                segment.remainingAfter > 0;
-
 
             let text =
                 segment.title +
@@ -420,56 +333,40 @@ function createPlan() {
                 segmentMinutes +
                 " min";
 
-
-            if (isContinuation) {
-
+            if (segment.remainingAfter > 0) {
                 text += " (continue tomorrow)";
-
             }
-
 
             item.textContent = text;
 
             videoList.appendChild(item);
-
         });
-
 
         dayBox.appendChild(videoList);
 
         schedule.appendChild(dayBox);
-
     });
 
 
-    // Update speed comparison
     updateSpeedComparison(speed);
 }
-// Compare different playback speeds
+
+
+// Speed comparison
 function updateSpeedComparison(speed) {
 
-    let normalTime =
-        formatTime(totalSeconds);
-
-    let fastTime =
-        formatTime(totalSeconds / speed);
-
-
     document.getElementById("normalTime").textContent =
-        normalTime;
-
+        formatTime(totalSeconds);
 
     document.getElementById("currentSpeed").textContent =
         speed + "x";
 
-
     document.getElementById("fastTime").textContent =
-        fastTime;
+        formatTime(totalSeconds / speed);
 }
 
 
-
-// Create plan whenever settings change
+// Update plan when settings change
 document
     .getElementById("hours")
     .addEventListener("input", createPlan);
