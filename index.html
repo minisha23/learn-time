@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LearnTime - Study Planner</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <nav>
+        <h2>📚 LearnTime</h2>
+        <span>Personalized Video Learning Planner</span>
+    </nav>
+
+    <div class="container">
+
+        <section class="hero">
+            <h1>Plan your learning time smarter.</h1>
+            <p>
+                Enter a YouTube playlist and create a simple study plan
+                based on your available time.
+            </p>
+
+            <div class="input-box">
+                <input
+                    type="text"
+                    id="playlistUrl"
+                    placeholder="Paste YouTube playlist URL"
+                >
+                <button onclick="analyzePlaylist()">Analyze Playlist</button>
+            </div>
+
+            <p id="message"></p>
+        </section>
+
+
+        <!-- Playlist information -->
+        <section id="result" class="hidden">
+
+            <div class="card playlist-info">
+                <h2 id="playlistTitle">Playlist</h2>
+
+                <div class="stats">
+                    <div>
+                        <h3 id="videoCount">0</h3>
+                        <p>Videos</p>
+                    </div>
+
+                    <div>
+                        <h3 id="totalTime">0 min</h3>
+                        <p>Total Duration</p>
+                    </div>
+
+                    <div>
+                        <h3 id="averageTime">0 min</h3>
+                        <p>Average Video</p>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Settings -->
+            <div class="card">
+                <h2>⚙️ Study Settings</h2>
+
+                <div class="settings">
+
+                    <div>
+                        <label>Hours per day</label>
+                        <input type="number" id="hours" value="1" min="0">
+                    </div>
+
+                    <div>
+                        <label>Minutes</label>
+                        <input type="number" id="minutes" value="0" min="0" max="59">
+                    </div>
+
+                    <div>
+                        <label>Playback Speed</label>
+                        <select id="speed">
+                            <option value="1">1x</option>
+                            <option value="1.25">1.25x</option>
+                            <option value="1.5" selected>1.5x</option>
+                            <option value="1.75">1.75x</option>
+                            <option value="2">2x</option>
+                        </select>
+                    </div>
+
+                </div>
+
+                <button class="plan-btn" onclick="createPlan()">
+                    Create Study Plan
+                </button>
+            </div>
+
+
+            <!-- Plan summary -->
+            <div class="card">
+                <h2>📅 Your Study Plan</h2>
+
+                <div class="plan-summary">
+
+                    <div>
+                        <h3 id="daysNeeded">0</h3>
+                        <p>Days Needed</p>
+                    </div>
+
+                    <div>
+                        <h3 id="videosPerDay">0</h3>
+                        <p>Videos / Day</p>
+                    </div>
+
+                    <div>
+                        <h3 id="finishDate">-</h3>
+                        <p>Finish Date</p>
+                    </div>
+
+                </div>
+
+                <div id="schedule"></div>
+            </div>
+
+
+            <!-- Speed comparison -->
+            <div class="card">
+                <h2>⏱️ Watch Time</h2>
+
+                <div class="speed-box">
+
+                    <div>
+                        <span>1x</span>
+                        <strong id="normalTime">0</strong>
+                    </div>
+
+                    <div>
+                        <span id="currentSpeed">1.5x</span>
+                        <strong id="fastTime">0</strong>
+                    </div>
+
+                </div>
+            </div>
+
+        </section>
+
+    </div>
+
+    <footer>
+        <p>LearnTime © 2026 | Built with HTML, CSS & JavaScript</p>
+    </footer>
+
+    <script src="script.js"></script>
+
+</body>
+</html>
